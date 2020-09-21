@@ -78,7 +78,6 @@ class PathDataset(tf.keras.utils.Sequence):
             return batch_x
         else: 
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
-            # print(f"batch_x : {batch_x}, batch_y : {batch_y}")
             return batch_x, batch_y
 
     def __len__(self):
