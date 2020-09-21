@@ -5,12 +5,13 @@ import time
 import arch
 import cv2 
 import numpy as np
+import pandas as pd
 import nsml
 from nsml.constants import DATASET_PATH, GPU_NUM
 import torch 
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader 
-
+from sklearn.model_selection import train_test_split
 ######################## DONOTCHANGE ###########################
 def bind_model(model):
     def save(dir_name):
@@ -64,7 +65,6 @@ def label_loader (root_path, keys):
     return labels
 ############################################################
 
-
 class PathDataset(Dataset): 
     def __init__(self,image_path, labels=None, test_mode= True): 
         self.len = len(image_path)
@@ -87,6 +87,23 @@ class PathDataset(Dataset):
     def __len__(self): 
         return self.len
 
+def run_epoch(batch_loader, epoch, mode):
+    for i, (images, labels) in enumerate(batch_loader):
+        images = images.to(device)
+        labels = labels.to(device)
+        
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        
+        # Backward and optimize
+        if mode is "train":
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+    print(f"epoch : {epoch}, mode : {mode}, epoch_total : {num_epochs}, loss : {loss.item()}")
+
+
 if __name__ == '__main__':
 
     ########## ENVIRONMENT SETUP ############
@@ -100,7 +117,7 @@ if __name__ == '__main__':
     ######################################################################
 
     # hyperparameters
-    args.add_argument('--epoch', type=int, default=1)
+    args.add_argument('--epoch', type=int, default=20)
     args.add_argument('--batch_size', type=int, default=64) 
     args.add_argument('--learning_rate', type=int, default=0.0001)
 
@@ -135,25 +152,59 @@ if __name__ == '__main__':
         image_keys, image_path = path_loader(root_path)
         labels = label_loader(root_path, image_keys)
         ##############################################
- 
-        batch_loader = DataLoader(\
-            dataset=PathDataset(image_path, labels, test_mode=False), 
+
+        dataList = list()
+
+        for x, y in zip(labels, image_path):
+            dataList.append([x, y])
+
+        data = pd.DataFrame(dataList, columns=['label', 'data'])
+
+        train_data, valid_data = train_test_split(data, test_size=0.2, random_state=42)
+        
+
+        train_data = DataLoader(\
+            dataset=PathDataset(train_data['data'].to_numpy(), train_data['label'].tolist(), test_mode=False), 
                 batch_size=batch_size, shuffle=True)
         
-        # Train the model
+        valid_data = DataLoader(\
+            dataset=PathDataset(valid_data['data'].to_numpy(), valid_data['label'].tolist(), test_mode=False), 
+                batch_size=batch_size, shuffle=True)
+
         for epoch in range(num_epochs):
-            for i, (images, labels) in enumerate(batch_loader):
-                images = images.to(device)
-                labels = labels.to(device)
+            run_epoch(train_data, epoch, "train")
+            run_epoch(valid_data, epoch, "valid")
+            # with torch.no_grad:
+            # for i, (images, labels) in enumerate(batch_loader):
+            #     images = images.to(device)
+            #     labels = labels.to(device)
                 
-                # Forward pass
-                outputs = model(images)
-                loss = criterion(outputs, labels)
+            #     # Forward pass
+            #     outputs = model(images)
+            #     loss = criterion(outputs, labels)
                 
-                # Backward and optimize
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            #     # Backward and optimize
+            #     optimizer.zero_grad()
+            #     loss.backward()
+            #     optimizer.step()
+            # print(f"epoch : {epoch}, epoch_total : {num_epochs}, loss : {loss.item()}")
+            # nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=loss.item())#, acc=train_acc)
+            # nsml.save(epoch)
+
+        # Train the model
+        # for epoch in range(num_epochs):
+        #     for i, (images, labels) in enumerate(batch_loader):
+        #         images = images.to(device)
+        #         labels = labels.to(device)
                 
-            nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=loss.item())#, acc=train_acc)
-            nsml.save(epoch)
+        #         # Forward pass
+        #         outputs = model(images)
+        #         loss = criterion(outputs, labels)
+                
+        #         # Backward and optimize
+        #         optimizer.zero_grad()
+        #         loss.backward()
+        #         optimizer.step()
+        #     print(f"epoch : {epoch}, epoch_total : {num_epochs}, loss : {loss.item()}")
+        #     nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=loss.item())#, acc=train_acc)
+        #     nsml.save(epoch)
