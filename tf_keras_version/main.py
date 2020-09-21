@@ -3,11 +3,13 @@ import argparse
 import sys
 import time
 import numpy as np
+import pandas as pd
 from matplotlib.image import imread
 import tensorflow as tf # Tensorflow 2
 import arch
 import nsml
 from nsml.constants import DATASET_PATH, GPU_NUM 
+from sklearn.model_selection import train_test_split
 import math
 
 ######################## DONOTCHANGE ###########################
@@ -76,6 +78,7 @@ class PathDataset(tf.keras.utils.Sequence):
             return batch_x
         else: 
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
+            # print(f"batch_x : {batch_x}, batch_y : {batch_y}")
             return batch_x, batch_y
 
     def __len__(self):
@@ -94,7 +97,7 @@ if __name__ == '__main__':
     ######################################################################
 
     # hyperparameters
-    args.add_argument('--epoch', type=int, default=1)
+    args.add_argument('--epoch', type=int, default=20)
     args.add_argument('--batch_size', type=int, default=16) 
     args.add_argument('--learning_rate', type=int, default=0.0001)
 
@@ -130,11 +133,21 @@ if __name__ == '__main__':
         image_keys, image_path = path_loader(root_path)
         labels = label_loader(root_path, image_keys)
         ##############################################
+        
+        dataList = list()
 
-        X = PathDataset(image_path, labels, batch_size = batch_size, test_mode=False)
- 
+        for x, y in zip(labels, image_path):
+            dataList.append([x, y])
+
+        data = pd.DataFrame(dataList, columns=['label', 'data'])
+
+        train_data, valid_data = train_test_split(data, test_size=0.2, random_state=42)
+
+        X = PathDataset(train_data['data'].to_numpy(), train_data['label'].tolist(), batch_size = batch_size, test_mode=False)
+        validX = PathDataset(valid_data['data'].to_numpy(), valid_data['label'].tolist(), batch_size = batch_size, test_mode=False)
+
         for epoch in range(num_epochs):
-            hist = model.fit(X, shuffle=True)        
+            hist = model.fit(X, validation_data=validX)        
 
             nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=hist.history['loss'])#, acc=train_acc)
             nsml.save(epoch)
