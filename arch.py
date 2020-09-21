@@ -132,7 +132,7 @@ def cnn():
     x = layers.GlobalAveragePooling2D()(x)
     x = layers.Dense(units=300, activation='relu', kernel_initializer='he_normal')(x)
     x = layers.Dense(units=30, activation='relu', kernel_initializer='he_normal')(x)
-    x = layers.Dense(units=1, activation='relu')(x)
+    x = layers.Dense(units=2, activation='softmax')(x)
 
     model = tf.keras.models.Model(inputs=[d_input], outputs=x)
     model.summary()

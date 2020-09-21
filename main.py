@@ -12,15 +12,18 @@ import math
 import random
 
 
-def setup_data(image_path, labels):
+def setup_data(image_path, labels, validation_split=0.2):
 
     total = []
-    for i in range(8000):
+    for i in range(len(labels)):
         total.append([image_path[i], labels[i]])
+
     random.shuffle(total)
     x, y, val_x, val_y = [], [], [], []
-    for i in range(8000):
-        if i < 6000:
+
+
+    for i in range(len(labels)):
+        if i < int(len(labels) * (1 - validation_split)):
             x.append(total[i][0])
             y.append(total[i][1])
         else:
@@ -93,13 +96,22 @@ class PathDataset(tf.keras.utils.Sequence):
         batch_x = np.array([imread(x) for x in image_paths])
 
         ### REQUIRED: PREPROCESSING ###
-        # batch_x /= 255
 
         if self.mode:
             return batch_x
         else:
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
-            return batch_x, batch_y
+
+            out = []
+            for data in batch_y:
+                if data == 1:
+                    out.append([0, 1])
+                else:
+                    out.append([1, 0])
+
+            out = np.array(out)
+
+            return batch_x, out
 
     def __len__(self):
         return math.ceil(len(self.image_path) / self.batch_size)
@@ -119,8 +131,8 @@ if __name__ == '__main__':
 
     # hyperparameters
     args.add_argument('--epoch', type=int, default=100)
-    args.add_argument('--batch_size', type=int, default=40)
-    args.add_argument('--learning_rate', type=int, default=0.00001)
+    args.add_argument('--batch_size', type=int, default=16)
+    args.add_argument('--learning_rate', type=int, default=0.000005)
 
     config = args.parse_args()
 
