@@ -1,3 +1,9 @@
+/.idea
+/.gitignore
+/nsml2
+/nsml
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
