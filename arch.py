@@ -140,5 +140,114 @@ def cnn():
 
     return model
 
+
+def cnn2():
+    d_input = layers.Input(shape=(512, 512, 3))
+    x = layers.ZeroPadding2D(padding=((5, 5), (5, 5)))(d_input)
+    x = layers.Conv2D(filters=64, kernel_size=9, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=128, kernel_size=7, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=256, kernel_size=5, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=512, kernel_size=3, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=1024, kernel_size=2, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=2048, kernel_size=2, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.Conv2D(filters=4096, kernel_size=2, strides=2)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation('relu')(x)
+    x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
+    x = layers.MaxPooling2D(pool_size=3, strides=1)(x)
+
+    x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(units=2048, activation='relu')(x)
+    x = layers.Dense(units=512, activation='relu')(x)
+    x = layers.Dense(units=2, activation='softmax')(x)
+
+    model = tf.keras.models.Model(inputs=[d_input], outputs=x)
+    model.summary()
+
+    return model
+
+def cnn3():
+    d_input = layers.Input(shape=(512, 512, 3))
+
+    a = oneblock(d_input, 128, 8, 2)
+
+    b = oneblock(a, 256, 5, 2)
+    c = oneblock(a, 256, 5, 2)
+
+    d = add_to_one([b, c], 512, 3, 2, 0.2)
+    e = add_to_one([b, c], 512, 3, 2, 0.2)
+    f = add_to_one([b, c], 512, 3, 2, 0.2)
+
+    g = add_to_one([d, e, f], 1024, 3, 2, 0.2)
+    h = add_to_one([d, e, f], 1024, 3, 2, 0.2)
+
+    i = add_to_one([g, h], 2048, 2, 2, 0.2)
+
+    # j = oneblock(i, 4096, 2, 2)
+
+    x = layers.GlobalAveragePooling2D()(i)
+    # x = layers.Dense(2048, 'relu')(x)
+    x = layers.Dense(50, 'relu')(x)
+    x = layers.Dense(2, 'softmax')(x)
+
+    model = tf.keras.models.Model(inputs=[d_input], outputs=x)
+    model.summary()
+    # tf.keras.utils.plot_model(model, 'model.png', True, True, 'TB', True, 200)
+
+    return model
+
+
+def oneblock(x, filters, kernel, stride):
+    x = layers.Conv2D(filters=filters, kernel_size=kernel, strides=stride)(x)
+    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.Activation(activation='relu')(x)
+
+    return x
+
+def add_to_one(lists, filters, size, stride, dropout_rate):
+    x = layers.Add()(lists)
+    x = layers.Dropout(dropout_rate)(x)
+    x = layers.Activation(activation='relu')(x)
+    x = oneblock(x, filters, size, stride)
+    return x
+
+def cnn4():
+    model = tf.keras.applications.ResNet50V2(True, None, None, (512, 512, 3), None, 2)
+
+    model.summary()
+    return model
+
 if __name__ == "__main__":
-    cnn()
+    cnn3()
+
+    # tf.keras.applications.ResNet152

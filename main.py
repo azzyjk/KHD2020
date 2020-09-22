@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib.image import imread
 import tensorflow as tf  # Tensorflow 2
 import arch
+import Callbacks
 import nsml
 from nsml.constants import DATASET_PATH, GPU_NUM
 import math
@@ -49,7 +50,6 @@ def bind_model(model):
         X = PathDataset(image_path, labels=None, batch_size=batch_size)
         y_hat = model.predict(X)
         result.extend(np.argmax(y_hat, axis=1))
-
         print('predicted')
         return np.array(result)
 
@@ -102,6 +102,7 @@ class PathDataset(tf.keras.utils.Sequence):
         else:
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
 
+
             out = []
             for data in batch_y:
                 if data == 1:
@@ -132,7 +133,7 @@ if __name__ == '__main__':
     # hyperparameters
     args.add_argument('--epoch', type=int, default=100)
     args.add_argument('--batch_size', type=int, default=16)
-    args.add_argument('--learning_rate', type=int, default=0.000005)
+    args.add_argument('--learning_rate', type=int, default=0.00001)
 
     config = args.parse_args()
 
@@ -143,10 +144,10 @@ if __name__ == '__main__':
     learning_rate = config.learning_rate
 
     # model setting ## 반드시 이 위치에서 로드해야함
-    model = arch.cnn()
+    model = arch.cnn3()
 
     # Loss and optimizer
-    model.compile(tf.keras.optimizers.Adam(),
+    model.compile(tf.keras.optimizers.Adam(lr=0.00001),
                   loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
                   metrics=['accuracy'])
 
@@ -176,7 +177,7 @@ if __name__ == '__main__':
             train = PathDataset(x, y, batch_size=batch_size, test_mode=False)
             val = PathDataset(vx, vy, batch_size=batch_size, test_mode=False)
 
-            hist = model.fit(train, validation_data=val, shuffle=True, verbose=1)
+            hist = model.fit(train, validation_data=val, shuffle=True, verbose=1, callbacks=[Callbacks.lr_scheduler])
             nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=hist.history['loss'])  # , acc=train_acc)
             nsml.save(epoch)
 
