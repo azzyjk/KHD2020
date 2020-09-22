@@ -129,3 +129,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+tf_keras_version/examples-hack/empty
+tf_keras_version/LICENSE-THIRD-PARTY.txt
+tf_keras_version/nsml.exe
+tf_keras_version/README.hack.txt
