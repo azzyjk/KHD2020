@@ -9,8 +9,9 @@ import tensorflow as tf # Tensorflow 2
 import arch
 import nsml
 from nsml.constants import DATASET_PATH, GPU_NUM 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 import math
+from tensorflow.keras.applications import *
 
 ######################## DONOTCHANGE ###########################
 def bind_model(model):
@@ -78,7 +79,15 @@ class PathDataset(tf.keras.utils.Sequence):
             return batch_x
         else: 
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
-            return batch_x, batch_y
+            # return batch_x, batch_y
+            out = list()
+            for label in batch_y:
+                if label == 1:
+                    out.append([0,1])
+                else :
+                    out.append([1,0])
+            out = np.array(out)
+            return batch_x, out
 
     def __len__(self):
         return math.ceil(len(self.image_path) / self.batch_size)
@@ -96,9 +105,9 @@ if __name__ == '__main__':
     ######################################################################
 
     # hyperparameters
-    args.add_argument('--epoch', type=int, default=20)
-    args.add_argument('--batch_size', type=int, default=16) 
-    args.add_argument('--learning_rate', type=int, default=0.0001)
+    args.add_argument('--epoch', type=int, default=100)
+    args.add_argument('--batch_size', type=int, default=32) 
+    args.add_argument('--learning_rate', type=int, default=0.0003)
 
     config = args.parse_args()
 
@@ -109,11 +118,12 @@ if __name__ == '__main__':
     learning_rate = config.learning_rate  
 
     # model setting ## 반드시 이 위치에서 로드해야함
-    model = arch.cnn() 
+    # model = arch.cnn() 
+    model = ResNet50V2(include_top=True, weights=None, input_shape=(512,512,3), classes=2, classifier_activation='softmax')
 
     # Loss and optimizer
-    model.compile(tf.keras.optimizers.Adam(),
-                loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    model.compile(tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
                 metrics=['accuracy'])
 
 
@@ -137,16 +147,21 @@ if __name__ == '__main__':
 
         for x, y in zip(labels, image_path):
             dataList.append([x, y])
-
+            
+        split = 5
+        kf = KFold(n_splits = split, shuffle=True, random_state=42)
         data = pd.DataFrame(dataList, columns=['label', 'data'])
-
-        train_data, valid_data = train_test_split(data, test_size=0.2, random_state=42)
-
-        X = PathDataset(train_data['data'].to_numpy(), train_data['label'].tolist(), batch_size = batch_size, test_mode=False)
-        validX = PathDataset(valid_data['data'].to_numpy(), valid_data['label'].tolist(), batch_size = batch_size, test_mode=False)
+        
 
         for epoch in range(num_epochs):
-            hist = model.fit(X, validation_data=validX)        
+            sumLoss = 0
+            for train_index, test_index in kf.split(data):
+                train_data, valid_data = data['data'][train_index], data['data'][test_index]
+                train_label, valid_label = data['label'][train_index], data['label'][test_index]
 
-            nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=hist.history['loss'])#, acc=train_acc)
+                X = PathDataset(train_data, train_label, batch_size = batch_size, test_mode=False)
+                validX = PathDataset(valid_data, valid_label, batch_size = batch_size, test_mode=False)
+
+                hist = model.fit(X, validation_data=validX, verbose=2)
+            nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=sumLoss/5)#, acc=train_acc)
             nsml.save(epoch)
