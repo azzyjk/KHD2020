@@ -1,16 +1,14 @@
 import os
 import argparse
-import sys
-import time
 import numpy as np
 from matplotlib.image import imread
 import tensorflow as tf  # Tensorflow 2
-import arch
-import Callbacks
+import arch, Callbacks
 import nsml
-from nsml.constants import DATASET_PATH, GPU_NUM
+from nsml.constants import DATASET_PATH
 import math
 import random
+import cv2
 
 
 def setup_data(image_path, labels, validation_split=0.2):
@@ -83,6 +81,15 @@ def label_loader(root_path, keys):
 
 ############################################################
 
+def blurAndHsv(img, blur=True, hsv=True, gray=False):
+    if blur:
+        img = cv2.GaussianBlur(img, (3, 3), 0)
+    if hsv:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    elif gray:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    return img
+
 
 class PathDataset(tf.keras.utils.Sequence):
     def __init__(self, image_path, labels=None, batch_size=128, test_mode=True):
@@ -95,14 +102,19 @@ class PathDataset(tf.keras.utils.Sequence):
         image_paths = self.image_path[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_x = np.array([imread(x) for x in image_paths])
 
+        """
+        batch_x_processed = []
+        for img in batch_x:
+            hsv = blurAndHsv(img, blur=True, hsv=False, gray=True)
+            batch_x_processed.append(hsv)
+        """
         ### REQUIRED: PREPROCESSING ###
 
         if self.mode:
             return batch_x
+            # return np.array(batch_x_processed)
         else:
             batch_y = np.array(self.labels[idx * self.batch_size:(idx + 1) * self.batch_size])
-
-
             out = []
             for data in batch_y:
                 if data == 1:
@@ -113,6 +125,7 @@ class PathDataset(tf.keras.utils.Sequence):
             out = np.array(out)
 
             return batch_x, out
+            # return np.array(batch_x_processed), out
 
     def __len__(self):
         return math.ceil(len(self.image_path) / self.batch_size)
@@ -131,7 +144,7 @@ if __name__ == '__main__':
     ######################################################################
 
     # hyperparameters
-    args.add_argument('--epoch', type=int, default=100)
+    args.add_argument('--epoch', type=int, default=1000)
     args.add_argument('--batch_size', type=int, default=16)
     args.add_argument('--learning_rate', type=int, default=0.00001)
 
@@ -147,8 +160,9 @@ if __name__ == '__main__':
     model = arch.cnn3()
 
     # Loss and optimizer
-    model.compile(tf.keras.optimizers.Adam(lr=0.00001),
-                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    model.compile(tf.keras.optimizers.Adam(lr=0.001),
+                  # loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
+                  loss=tf.keras.losses.CategoricalCrossentropy(),
                   metrics=['accuracy'])
 
     ############ DONOTCHANGE ###############
@@ -173,11 +187,11 @@ if __name__ == '__main__':
         # 이걸 이용해 validation_split도 만들 수 있지 않을까?
 
         for epoch in range(num_epochs):
-            x, y, vx, vy = setup_data(image_path, labels)
+            x, y, vx, vy = setup_data(image_path, labels, validation_split=0.1)
             train = PathDataset(x, y, batch_size=batch_size, test_mode=False)
             val = PathDataset(vx, vy, batch_size=batch_size, test_mode=False)
 
-            hist = model.fit(train, validation_data=val, shuffle=True, verbose=1, callbacks=[Callbacks.lr_scheduler])
+            hist = model.fit(train, validation_data=val, shuffle=True, verbose=1 ,callbacks=[Callbacks.lr_scheduler])
             nsml.report(summary=True, step=epoch, epoch_total=num_epochs, loss=hist.history['loss'])  # , acc=train_acc)
             nsml.save(epoch)
 

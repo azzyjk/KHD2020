@@ -1,6 +1,9 @@
+import keras_drop_connect
 import tensorflow as tf # Tensorflow 2
 import tensorflow.keras.layers as layers
 import tensorflow.keras.initializers as initializers
+import tensorlayer as tl
+from keras_drop_connect import DropConnect
 def cnn_example():
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Conv2D(64, (5, 5),
@@ -196,8 +199,8 @@ def cnn2():
 
     return model
 
-def cnn3():
-    d_input = layers.Input(shape=(512, 512, 3))
+def cnn3(channel_num=3):
+    d_input = layers.Input(shape=(512, 512, channel_num))
 
     a = oneblock(d_input, 128, 8, 2)
 
@@ -229,7 +232,7 @@ def cnn3():
 
 def oneblock(x, filters, kernel, stride):
     x = layers.Conv2D(filters=filters, kernel_size=kernel, strides=stride)(x)
-    x = layers.BatchNormalization(axis=3)(x)
+    x = layers.BatchNormalization(axis=1)(x)
     x = layers.Activation(activation='relu')(x)
 
     return x
@@ -242,12 +245,84 @@ def add_to_one(lists, filters, size, stride, dropout_rate):
     return x
 
 def cnn4():
-    model = tf.keras.applications.ResNet50V2(True, None, None, (512, 512, 3), None, 2)
+    d_input = layers.Input(shape=(512, 512, 2))
+    d2_input = layers.Input(shape=20)
 
+    x = layers.GlobalAveragePooling2D()(d_input)
+    x2 = layers.Dense(40)(d2_input)
+
+    final = layers.Concatenate()([x, x2])
+
+    model = tf.keras.models.Model(inputs=[d_input, d2_input], outputs=final)
     model.summary()
-    return model
+
+    tf.keras.utils.plot_model(model, "test.png")
+
+def cnn5():
+    d_input = layers.Input(shape=(512, 512, 3))
+    x = layers.Conv2D(filters=64, strides=2, kernel_size=4, padding='same')(d_input)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.35)(x)
+    x = layers.Conv2D(filters=128, strides=2, kernel_size=4, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.35)(x)
+    x = layers.Conv2D(filters=256, strides=2, kernel_size=4, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=(2, 2))(x)
+    x = layers.Dropout(0.35)(x)
+    x = layers.Conv2D(filters=512, strides=2, kernel_size=4, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.35)(x)
+    x = layers.Conv2D(filters=1000, strides=1, kernel_size=4, padding='same')(x)
+    # x = layers.BatchNormalization()(x)
+    # x = layers.Dropout(0.35)(x)
+    # x = layers.Conv2D(filters=1000, strides=1, kernel_size=4, padding='same')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=(2, 2))(x)
+    x = layers.Dropout(0.35)(x)
+
+    x = layers.Permute((3, 1, 2))(x)
+
+    # x = layers.Cropping2D(cropping=((0, 1800), (0, 0)))(x)
+    # x = layers.Permute((2, 3, 1))(x)
+
+    div10 = 100
+
+    x1 = feature_map(x, 0, div10*9)
+    x2 = feature_map(x, div10, div10*8)
+    x3 = feature_map(x, div10*2, div10*7)
+    x4 = feature_map(x, div10*3, div10*6)
+    x5 = feature_map(x, div10*4, div10*5)
+    x6 = feature_map(x, div10*5, div10*4)
+    x7 = feature_map(x, div10*6, div10*3)
+    x8 = feature_map(x, div10*7, div10*2)
+    x9 = feature_map(x, div10*8, div10*1)
+    x10 = feature_map(x,div10*9, 0)
+
+    x = layers.Add()([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10])
+    x = layers.Activation('softmax')(x)
+
+    # 10개의 Feature Map을 만들어야한다.
+
+    model = tf.keras.models.Model(inputs=[d_input], outputs=x)
+    model.summary()
+
+def feature_map(x, start, end):
+    x = layers.Cropping2D(cropping=((start, end), (0, 0)))(x)
+    x = layers.Permute((2, 3, 1))(x)
+    x = layers.Flatten()(x)
+    x = layers.Dense(256)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.5)(x)
+    x = layers.Dense(256)(x)
+    x = layers.Dense(2, activation='softmax')(x)
+
+    return x
+
+
+
 
 if __name__ == "__main__":
-    cnn3()
+    cnn5()
 
     # tf.keras.applications.ResNet152
